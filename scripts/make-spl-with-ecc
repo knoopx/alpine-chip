@@ -1,0 +1,38 @@
+#!/bin/sh
+
+set -ex
+
+TMPDIR=`mktemp -d -t chip-flash-XXXXXX`
+
+NAND_ECC_STRENGTH=64
+NAND_ECC_STEP_SIZE=1024
+NAND_USABLE_SIZE=1024
+
+NAND_BLOCK_SIZE=$1
+NAND_PAGE_SIZE=$2
+NAND_OOB_SIZE=$3
+SPL=$4
+SPL_PADDED=$5
+
+spl_padded_tmp_1="$TMPDIR/sunxi-spl-padded-tmp1.bin"
+spl_padded_tmp_2="$TMPDIR/sunxi-spl-padded-tmp2.bin"
+spl_padded_tmp_3="$TMPDIR/sunxi-spl-padded-tmp3.bin"
+spl_padded_tmp_4="$TMPDIR/sunxi-spl-padded-tmp4.bin"
+
+sunxi-nand-image-builder -c "${NAND_ECC_STRENGTH}/${NAND_ECC_STEP_SIZE}" -p "${NAND_PAGE_SIZE}" -o "${NAND_OOB_SIZE}" -u "${NAND_USABLE_SIZE}" -e "${NAND_BLOCK_SIZE}" -b -s "${SPL}" "${spl_padded_tmp_1}"
+
+i=0
+repeat=$(($NAND_BLOCK_SIZE / $NAND_PAGE_SIZE / 64))
+padding_size=$((64 - (`stat --printf="%s" $spl_padded_tmp_1` / ($NAND_PAGE_SIZE + $NAND_OOB_SIZE))))
+
+while [ $i -lt $repeat ]; do
+  dd if=/dev/urandom of=$spl_padded_tmp_2 bs=1024 count=$padding_size
+  sunxi-nand-image-builder -c "${NAND_ECC_STRENGTH}/${NAND_ECC_STEP_SIZE}" -p "${NAND_PAGE_SIZE}" -o "${NAND_OOB_SIZE}" -u "${NAND_USABLE_SIZE}" -e "${NAND_BLOCK_SIZE}" -b -s "${spl_padded_tmp_2}" "${spl_padded_tmp_3}"
+  cat $spl_padded_tmp_1 $spl_padded_tmp_3 > $spl_padded_tmp_4
+  if [ "$i" -eq "0" ]; then
+    cat $spl_padded_tmp_4 > "${SPL_PADDED}"
+  else
+    cat $spl_padded_tmp_4 >> "${SPL_PADDED}"
+  fi
+  i=$((i+1))
+done
