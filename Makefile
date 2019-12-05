@@ -2,6 +2,7 @@
 
 ARCH 					:= armhf
 ALPINE_CHROOT := /alpine
+ALPINE_CHROOT_INSTALL_VERSION := master
 ALPINE_BRANCH := edge
 ALPINE_MIRROR := http://dl-cdn.alpinelinux.org/alpine
 
@@ -102,8 +103,8 @@ dist/rootfs.ubi: dist/ubinize.cfg dist/rootfs.ubifs
 	ubinize -o $@ -p $(NAND_ERASE_BLOCK_SIZE) -m $(NAND_PAGE_SIZE) -s $(NAND_SUBPAGE_SIZE) -M dist3 dist/ubinize.cfg
 
 .ONESHELL:
-$(ALPINE_CHROOT): vendor/linux-image-$(KERNEL_VERSION)_$(KERNEL_REV_ARCH)_$(ARCH).deb vendor/rtl8723bs-mp-driver-modules-$(KERNEL_VERSION)_$(MP_DRIVER_REV_ARCH)+$(KERNEL_REV_ARCH)_all.deb
-	scripts/alpine-chroot-install -d $(ALPINE_CHROOT) -a $(ARCH) -b $(ALPINE_BRANCH) -m $(ALPINE_MIRROR)
+$(ALPINE_CHROOT): vendor/alpine-chroot-install vendor/linux-image-$(KERNEL_VERSION)_$(KERNEL_REV_ARCH)_$(ARCH).deb vendor/rtl8723bs-mp-driver-modules-$(KERNEL_VERSION)_$(MP_DRIVER_REV_ARCH)+$(KERNEL_REV_ARCH)_all.deb
+	vendor/alpine-chroot-install -d $(ALPINE_CHROOT) -a $(ARCH) -b $(ALPINE_BRANCH) -m $(ALPINE_MIRROR)
 
 	dpkg -x vendor/linux-image-$(KERNEL_VERSION)_$(KERNEL_REV_ARCH)_$(ARCH).deb $(ALPINE_CHROOT)
 	mv $(ALPINE_CHROOT)/boot/vmlinuz-$(KERNEL_VERSION) $(ALPINE_CHROOT)/boot/zImage
@@ -197,6 +198,9 @@ vendor/linux-image-%.deb:
 
 vendor/rtl8723bs-mp-driver-modules-%.deb:
 	cd vendor &&  wget $(CHIP_APT_REPO)/pool/main/r/rtl8723bs-mp-driver/$(notdir $@)
+
+vendor/alpine-chroot-install:
+	cd vendor && wget https://raw.githubusercontent.com/alpinelinux/alpine-chroot-install/$(ALPINE_CHROOT_INSTALL_VERSION)/alpine-chroot-install && chmod +x $(notdir $@)
 
 clean:
 	rm -Rf dist/*
